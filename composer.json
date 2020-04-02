@@ -1,0 +1,32 @@
+{
+  "name": "dibify/locker-redis",
+  "type": "library",
+  "description": "DiBify Redis-based locker",
+  "keywords": [
+    "db",
+    "database",
+    "orm"
+  ],
+  "authors": [
+    {
+      "name": "Timur Kasumov aka XAKEPEHOK",
+      "role": "Main developer"
+    }
+  ],
+  "license": "BSD-3-Clause",
+  "require": {
+    "php": ">=7.3.0",
+    "ext-redis": "^5.0.0",
+    "ext-json": "*",
+    "dibify/dibify": "^0.1.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.0"
+  },
+  "autoload": {
+    "psr-4": {"DiBify\\Locker\\Redis\\": "src/"}
+  },
+  "autoload-dev": {
+    "psr-4": {"DiBify\\Locker\\Redis\\": "tests/"}
+  }
+}
