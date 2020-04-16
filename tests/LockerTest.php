@@ -9,8 +9,8 @@ namespace DiBify\Locker\Redis;
 
 use DiBify\DiBify\Exceptions\InvalidArgumentException;
 use DiBify\DiBify\Id\Id;
-use DiBify\DiBify\Model\Link;
 use DiBify\DiBify\Model\ModelInterface;
+use DiBify\DiBify\Model\Reference;
 use PHPUnit\Framework\TestCase;
 use Redis;
 
@@ -169,7 +169,7 @@ class LockerTest extends TestCase
         $this->locker->lock($this->model_1, $this->model_2);
 
         $lockerLink = $this->locker->getLocker($this->model_1);
-        $this->assertInstanceOf(Link::class, $lockerLink);
+        $this->assertInstanceOf(Reference::class, $lockerLink);
         $this->assertSame($this->model_2, $lockerLink->getModel());
 
         $this->assertNull($this->locker->getLocker($this->model_2));

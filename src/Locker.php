@@ -10,7 +10,7 @@ namespace DiBify\Locker\Redis;
 
 use DiBify\DiBify\Exceptions\InvalidArgumentException;
 use DiBify\DiBify\Locker\LockerInterface;
-use DiBify\DiBify\Model\Link;
+use DiBify\DiBify\Model\Reference;
 use DiBify\DiBify\Model\ModelInterface;
 use Redis;
 
@@ -128,16 +128,16 @@ class Locker implements LockerInterface
     /**
      * @inheritDoc
      */
-    public function getLocker($modelOrLink): ?Link
+    public function getLocker($modelOrReference): ?Reference
     {
-        $modelKey = $this->getKeyPrefix() . $this->getModelIdentity($modelOrLink);
+        $modelKey = $this->getKeyPrefix() . $this->getModelIdentity($modelOrReference);
         $modelLocker = $this->getRedis()->get($modelKey);
 
         if ($modelLocker === false) {
             return null;
         }
 
-        return Link::fromJson($modelLocker);
+        return Reference::fromJson($modelLocker);
     }
 
     /**
@@ -169,13 +169,13 @@ class Locker implements LockerInterface
         return $this->maxTimeout;
     }
 
-    protected function getModelIdentity($modelOrLink): string
+    protected function getModelIdentity($modelOrReference): string
     {
-        if ($modelOrLink instanceof Link) {
-            return json_encode($modelOrLink);
+        if ($modelOrReference instanceof Reference) {
+            return json_encode($modelOrReference);
         }
 
-        return json_encode(Link::to($modelOrLink));
+        return json_encode(Reference::to($modelOrReference));
     }
 
     /**
