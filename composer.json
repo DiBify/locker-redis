@@ -20,7 +20,7 @@
     "php": ">=7.3.0",
     "ext-redis": "^5.0.0",
     "ext-json": "*",
-    "dibify/dibify": "^0.2.0"
+    "dibify/dibify": "^0.3.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^9.0"
