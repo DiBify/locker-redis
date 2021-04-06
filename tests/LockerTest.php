@@ -17,29 +17,21 @@ use Redis;
 class LockerTest extends TestCase
 {
 
-    /** @var Redis */
-    private $redis;
+    private Redis $redis;
 
-    /** @var string */
-    private $prefix;
+    private string $prefix;
 
-    /** @var int */
-    private $defaultTimeout;
+    private int $defaultTimeout;
 
-    /** @var int */
-    private $maxTimeout;
+    protected int $maxTimeout;
 
-    /** @var Locker */
-    private $locker;
+    protected Locker $locker;
 
-    /** @var ModelInterface */
-    private $model_1;
+    private ModelInterface $model_1;
 
-    /** @var ModelInterface */
-    private $model_2;
+    private ModelInterface $model_2;
 
-    /** @var ModelInterface */
-    private $model_3;
+    private ModelInterface $model_3;
 
     protected function setUp(): void
     {

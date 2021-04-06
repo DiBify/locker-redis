@@ -17,17 +17,13 @@ use Redis;
 class Locker implements LockerInterface
 {
 
-    /** @var Redis */
-    private $redis;
+    private Redis $redis;
 
-    /** @var string */
-    private $keyPrefix;
+    private string $keyPrefix;
 
-    /** @var int */
-    private $defaultTimeout;
+    private int $defaultTimeout;
 
-    /** @var int */
-    private $maxTimeout;
+    private int $maxTimeout;
 
     public function __construct(Redis $redis, string $keyPrefix = 'Locker:', int $defaultTimeout = 5, int $maxTimeout = 60)
     {
