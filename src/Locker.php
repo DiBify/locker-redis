@@ -10,12 +10,15 @@ namespace DiBify\Locker\Redis;
 
 use DiBify\DiBify\Exceptions\InvalidArgumentException;
 use DiBify\DiBify\Locker\LockerInterface;
+use DiBify\DiBify\Locker\WaitForLockTrait;
 use DiBify\DiBify\Model\Reference;
 use DiBify\DiBify\Model\ModelInterface;
 use Redis;
 
 class Locker implements LockerInterface
 {
+
+    use WaitForLockTrait;
 
     private Redis $redis;
 
