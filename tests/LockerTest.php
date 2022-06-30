@@ -9,6 +9,7 @@ namespace DiBify\Locker\Redis;
 
 use DiBify\DiBify\Exceptions\InvalidArgumentException;
 use DiBify\DiBify\Id\Id;
+use DiBify\DiBify\Locker\Lock\Lock;
 use DiBify\DiBify\Model\ModelInterface;
 use DiBify\DiBify\Model\Reference;
 use PHPUnit\Framework\TestCase;
@@ -37,7 +38,7 @@ class LockerTest extends TestCase
     {
         parent::setUp();
         $this->redis = new Redis();
-        $this->redis->connect('127.0.0.1', 6379);
+        $this->redis->connect('localhost', 6379);
         $this->redis->select(0);
 
         $this->prefix = 'Locker:';
@@ -96,78 +97,85 @@ class LockerTest extends TestCase
         };
     }
 
-    public function testLock()
+    public function testLock(): void
     {
-        $this->assertTrue($this->locker->lock($this->model_1, $this->model_2));
-        $this->assertTrue($this->locker->lock($this->model_1, $this->model_2));
-        $this->assertFalse($this->locker->lock($this->model_1, $this->model_3));
+        $this->assertTrue($this->locker->lock($this->model_1, new Lock($this->model_2)));
+        $this->assertTrue($this->locker->lock($this->model_1, new Lock($this->model_2)));
+        $this->assertFalse($this->locker->lock($this->model_1, new Lock($this->model_3)));
+        $this->assertFalse($this->locker->lock($this->model_1, new Lock($this->model_2, 'with_identity')));
 
 
-        $this->assertTrue($this->locker->lock($this->model_1, $this->model_2, 1));
+        $this->assertTrue($this->locker->lock($this->model_1, new Lock($this->model_2, null, 1)));
         usleep(1200000);
-        $this->assertTrue($this->locker->lock($this->model_1, $this->model_3));
+        $this->assertTrue($this->locker->lock($this->model_1, new Lock($this->model_3)));
     }
 
-    public function testLockWithZeroTimeout()
+    public function testLockWithZeroTimeout(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->locker->lock($this->model_1, $this->model_2, 0);
+        $this->locker->lock($this->model_1, new Lock($this->model_2, null, 0));
     }
 
-    public function testLockWithTooBigTimeout()
+    public function testLockWithTooBigTimeout(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->locker->lock($this->model_1, $this->model_2, 1000);
+        $this->locker->lock($this->model_1, new Lock($this->model_2, null, 1000));
     }
 
-    public function testUnlock()
+    public function testUnlock(): void
     {
-        $this->assertTrue($this->locker->unlock($this->model_1, $this->model_2));
-        $this->assertTrue($this->locker->lock($this->model_1, $this->model_2));
-        $this->assertFalse($this->locker->unlock($this->model_1, $this->model_3));
-        $this->assertTrue($this->locker->unlock($this->model_1, $this->model_2));
+        $this->assertTrue($this->locker->unlock($this->model_1, new Lock($this->model_2)));
+        $this->assertTrue($this->locker->lock($this->model_1, new Lock($this->model_2)));
+        $this->assertFalse($this->locker->unlock($this->model_1, new Lock($this->model_3)));
+        $this->assertFalse($this->locker->unlock($this->model_1, new Lock($this->model_2, 'with_identity')));
+        $this->assertTrue($this->locker->unlock($this->model_1, new Lock($this->model_2)));
     }
 
-    public function testPassLock()
+    public function testPassLock(): void
     {
-        $this->assertTrue($this->locker->passLock($this->model_1, $this->model_2, $this->model_3));
-        $this->assertTrue($this->locker->passLock($this->model_1, $this->model_3, $this->model_2));
-        $this->assertFalse($this->locker->passLock($this->model_1, $this->model_3, $this->model_2));
+        $this->assertTrue($this->locker->passLock($this->model_1, new Lock($this->model_2), new Lock($this->model_3)));
+        $this->assertTrue($this->locker->passLock($this->model_1, new Lock($this->model_3), new Lock($this->model_2)));
+        $this->assertFalse($this->locker->passLock($this->model_1, new Lock($this->model_2, 'with_identity'), new Lock($this->model_3)));
+        $this->assertFalse($this->locker->passLock($this->model_1, new Lock($this->model_3), new Lock($this->model_2)));
     }
 
-    public function testPassLockWithZeroTimeout()
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->locker->passLock($this->model_1, $this->model_2, $this->model_3, 0);
-    }
-
-    public function testPassLockWithTooBigTimeout()
+    public function testPassLockWithZeroTimeout(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->locker->passLock($this->model_1, $this->model_2, $this->model_3, 1000);
+        $this->locker->passLock($this->model_1, new Lock($this->model_2), new Lock($this->model_3, null, 0));
     }
 
-    public function testIsLockedFor()
+    public function testPassLockWithTooBigTimeout(): void
     {
-        $this->locker->lock($this->model_1, $this->model_2);
-
-        $this->assertTrue($this->locker->isLockedFor($this->model_1, $this->model_3));
-        $this->assertFalse($this->locker->isLockedFor($this->model_1, $this->model_2));
-        $this->assertFalse($this->locker->isLockedFor($this->model_2, $this->model_3));
+        $this->expectException(InvalidArgumentException::class);
+        $this->locker->passLock($this->model_1, new Lock($this->model_2), new Lock($this->model_3, null, 1000));
     }
 
-    public function testGetLocker()
+    public function testIsLockedFor(): void
     {
-        $this->locker->lock($this->model_1, $this->model_2);
+        $this->locker->lock($this->model_1, new Lock($this->model_2));
 
-        $lockerLink = $this->locker->getLocker($this->model_1);
-        $this->assertInstanceOf(Reference::class, $lockerLink);
-        $this->assertSame($this->model_2, $lockerLink->getModel());
-
-        $this->assertNull($this->locker->getLocker($this->model_2));
+        $this->assertTrue($this->locker->isLockedFor($this->model_1, new Lock($this->model_3)));
+        $this->assertTrue($this->locker->isLockedFor($this->model_1, new Lock($this->model_2, 'with_identity')));
+        $this->assertFalse($this->locker->isLockedFor($this->model_1, new Lock($this->model_2)));
+        $this->assertFalse($this->locker->isLockedFor($this->model_2, new Lock($this->model_3)));
     }
 
-    public function testGetDefaultTimeout()
+    public function testGetLock(): void
+    {
+        $lock = new Lock($this->model_2, null, 10);
+        $this->locker->lock($this->model_1, $lock);
+
+        sleep(2);
+        $actualLock = $this->locker->getLock($this->model_1);
+        $this->assertInstanceOf(Lock::class, $actualLock);
+        $this->assertTrue($actualLock->isCompatible($lock));
+        $this->assertEquals(8, $actualLock->getTimeout());
+
+        $this->assertNull($this->locker->getLock($this->model_2));
+    }
+
+    public function testGetDefaultTimeout(): void
     {
         $this->assertSame(
             $this->defaultTimeout,
@@ -175,7 +183,7 @@ class LockerTest extends TestCase
         );
     }
 
-    public function testGetMaxTimeout()
+    public function testGetMaxTimeout(): void
     {
         $this->assertSame(
             $this->maxTimeout,
@@ -183,7 +191,7 @@ class LockerTest extends TestCase
         );
     }
 
-    public function testGetKeyPrefix()
+    public function testGetKeyPrefix(): void
     {
         $this->assertSame(
             $this->prefix,

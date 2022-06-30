@@ -9,6 +9,7 @@ namespace DiBify\Locker\Redis;
 
 
 use DiBify\DiBify\Exceptions\InvalidArgumentException;
+use DiBify\DiBify\Locker\Lock\Lock;
 use DiBify\DiBify\Locker\LockerInterface;
 use DiBify\DiBify\Locker\WaitForLockTrait;
 use DiBify\DiBify\Model\Reference;
@@ -37,45 +38,39 @@ class Locker implements LockerInterface
     }
 
     /**
-     * @inheritDoc
      * @throws InvalidArgumentException
      */
-    public function lock(ModelInterface $model, ModelInterface $locker, int $timeout = null): bool
+    public function lock(ModelInterface $model, Lock $lock): bool
     {
-        $this->guardTimeout($timeout);
+        $this->guardTimeout($lock);
 
-        $modelKey = $this->getKeyPrefix() . $this->getModelIdentity($model);
-        $modelLocker = $this->getModelIdentity($locker);
+        $modelKey = $this->getKeyPrefix() . $this->getModelKey($model);
+        $modelLocker = $this->getLockKey($lock);
 
         if ($this->getRedis()->setnx($modelKey, $modelLocker)) {
-            $this->getRedis()->expire($modelKey, $timeout ?? $this->getDefaultTimeout());
+            $this->getRedis()->expire($modelKey, $lock->getTimeout() ?? $this->getDefaultTimeout());
             return true;
         }
 
-        $current = $this->getRedis()->get($modelKey);
-        if ($current === $modelLocker) {
-            $this->getRedis()->expire($modelKey, $timeout ?? $this->getDefaultTimeout());
+        if ($this->getLock($model)->isCompatible($lock)) {
+            $this->getRedis()->expire($modelKey, $lock->getTimeout() ?? $this->getDefaultTimeout());
             return true;
         }
 
         return false;
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function unlock(ModelInterface $model, ModelInterface $locker): bool
+    public function unlock(ModelInterface $model, Lock $lock): bool
     {
-        $modelKey = $this->getKeyPrefix() . $this->getModelIdentity($model);
-        $modelLocker = $this->getModelIdentity($locker);
+        $modelKey = $this->getKeyPrefix() . $this->getModelKey($model);
 
-        $currentLocker = $this->getRedis()->get($modelKey);
+        $actualLock = $this->getLock($model);
 
-        if ($currentLocker === false) {
+        if (!$actualLock) {
             return true;
         }
 
-        if ($currentLocker === $modelLocker) {
+        if ($actualLock->isCompatible($lock)) {
             $this->getRedis()->del($modelKey);
             return true;
         }
@@ -84,59 +79,54 @@ class Locker implements LockerInterface
     }
 
     /**
-     * @inheritDoc
      * @throws InvalidArgumentException
      */
-    public function passLock(ModelInterface $model, ModelInterface $currentLocker, ModelInterface $nextLocker, int $timeout = null): bool
+    public function passLock(ModelInterface $model, Lock $currentLock, Lock $lock): bool
     {
-        $this->guardTimeout($timeout);
+        $this->guardTimeout($lock);
+        $actualLock = $this->getLock($model);
 
-        $modelKey = $this->getKeyPrefix() . $this->getModelIdentity($model);
-        $modelCurrentLocker = $this->getModelIdentity($currentLocker);
-        $modelNextLocker = $this->getModelIdentity($nextLocker);
-
-        $modelLocker = $this->getRedis()->get($modelKey);
-
-        if ($modelLocker === false) {
-            return $this->lock($model, $nextLocker, $timeout);
+        if (!$actualLock) {
+            return $this->lock($model, $lock);
         }
 
-        if ($modelLocker === $modelCurrentLocker) {
-            $this->getRedis()->set($modelKey, $modelNextLocker, $timeout);
+        if ($actualLock->isCompatible($currentLock)) {
+            $modelKey = $this->getKeyPrefix() . $this->getModelKey($model);
+            $this->getRedis()->set($modelKey, $this->getLockKey($lock), $lock->getTimeout() ?? $this->defaultTimeout);
             return true;
         }
 
         return false;
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function isLockedFor(ModelInterface $model, ModelInterface $locker): bool
+    public function isLockedFor(ModelInterface $model, Lock $lock): bool
     {
-        $modelKey = $this->getKeyPrefix() . $this->getModelIdentity($model);
-        $modelLocker = $this->getRedis()->get($modelKey);
-
-        if ($modelLocker === false) {
+        if (!$actualLock = $this->getLock($model)) {
             return false;
         }
 
-        return $modelLocker !== $this->getModelIdentity($locker);
+        return !$actualLock->isCompatible($lock);
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function getLocker($modelOrReference): ?Reference
+
+    public function getLock(ModelInterface $model): ?Lock
     {
-        $modelKey = $this->getKeyPrefix() . $this->getModelIdentity($modelOrReference);
+        $modelKey = $this->getKeyPrefix() . $this->getModelKey($model);
         $modelLocker = $this->getRedis()->get($modelKey);
 
-        if ($modelLocker === false) {
+        if (!$modelLocker) {
             return null;
         }
 
-        return Reference::fromJson($modelLocker);
+        $lockerData = json_decode($modelLocker, true);
+        $lockerTimeout = $this->redis->ttl($modelKey);
+
+        $reference = Reference::fromArray($lockerData['locker']);
+        return new Lock(
+            locker: $reference,
+            identity: $lockerData['identity'],
+            timeout: $lockerTimeout > 0 ? $lockerTimeout : null
+        );
     }
 
     /**
@@ -168,7 +158,7 @@ class Locker implements LockerInterface
         return $this->maxTimeout;
     }
 
-    protected function getModelIdentity($modelOrReference): string
+    protected function getModelKey($modelOrReference): string
     {
         if ($modelOrReference instanceof Reference) {
             return json_encode($modelOrReference);
@@ -177,13 +167,18 @@ class Locker implements LockerInterface
         return json_encode(Reference::to($modelOrReference));
     }
 
+    protected function getLockKey(Lock $lock): string
+    {
+        return json_encode($lock);
+    }
+
     /**
-     * @param int $timeout
+     * @param Lock $lock
      * @throws InvalidArgumentException
      */
-    protected function guardTimeout(?int $timeout)
+    protected function guardTimeout(Lock $lock)
     {
-        $timeout = $timeout ?? $this->getDefaultTimeout();
+        $timeout = $lock->getTimeout() ?? $this->getDefaultTimeout();
         if (1 > $timeout || $this->getMaxTimeout() < $timeout) {
             throw new InvalidArgumentException("Lock timeout should be between 1 and {$this->getMaxTimeout()} seconds");
         }
