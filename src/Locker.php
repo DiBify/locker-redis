@@ -15,6 +15,8 @@ use DiBify\DiBify\Locker\WaitForLockTrait;
 use DiBify\DiBify\Model\Reference;
 use DiBify\DiBify\Model\ModelInterface;
 use Redis;
+use RedisException;
+use Throwable;
 
 class Locker implements LockerInterface
 {
@@ -38,9 +40,15 @@ class Locker implements LockerInterface
     }
 
     /**
+     * @param ModelInterface $model
+     * @param Lock $lock
+     * @param Throwable|null $throwable
+     * @return bool
      * @throws InvalidArgumentException
+     * @throws Throwable
+     * @throws RedisException
      */
-    public function lock(ModelInterface $model, Lock $lock): bool
+    public function lock(ModelInterface $model, Lock $lock, ?Throwable $throwable = null): bool
     {
         $this->guardTimeout($lock);
 
@@ -57,10 +65,22 @@ class Locker implements LockerInterface
             return true;
         }
 
+        if ($throwable) {
+            throw $throwable;
+        }
+
         return false;
     }
 
-    public function unlock(ModelInterface $model, Lock $lock): bool
+    /**
+     * @param ModelInterface $model
+     * @param Lock $lock
+     * @param Throwable|null $throwable
+     * @return bool
+     * @throws RedisException
+     * @throws Throwable
+     */
+    public function unlock(ModelInterface $model, Lock $lock, ?Throwable $throwable = null): bool
     {
         $modelKey = $this->getKeyPrefix() . $this->getModelKey($model);
 
@@ -75,25 +95,40 @@ class Locker implements LockerInterface
             return true;
         }
 
+        if ($throwable) {
+            throw $throwable;
+        }
+
         return false;
     }
 
     /**
+     * @param ModelInterface $model
+     * @param Lock $currentLock
+     * @param Lock $lock
+     * @param Throwable|null $throwable
+     * @return bool
      * @throws InvalidArgumentException
+     * @throws RedisException
+     * @throws Throwable
      */
-    public function passLock(ModelInterface $model, Lock $currentLock, Lock $lock): bool
+    public function passLock(ModelInterface $model, Lock $currentLock, Lock $lock, ?Throwable $throwable = null): bool
     {
         $this->guardTimeout($lock);
         $actualLock = $this->getLock($model);
 
         if (!$actualLock) {
-            return $this->lock($model, $lock);
+            return $this->lock($model, $lock, $throwable);
         }
 
         if ($actualLock->isCompatible($currentLock)) {
             $modelKey = $this->getKeyPrefix() . $this->getModelKey($model);
             $this->getRedis()->set($modelKey, $this->getLockKey($lock), $lock->getTimeout() ?? $this->defaultTimeout);
             return true;
+        }
+
+        if ($throwable) {
+            throw $throwable;
         }
 
         return false;
