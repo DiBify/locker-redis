@@ -60,7 +60,7 @@ class Locker implements LockerInterface
             return true;
         }
 
-        if ($this->getLock($model)->isCompatible($lock)) {
+        if ($this->getLock($model)?->isCompatible($lock)) {
             $this->getRedis()->expire($modelKey, $lock->getTimeout() ?? $this->getDefaultTimeout());
             return true;
         }
