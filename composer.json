@@ -18,7 +18,7 @@
   "license": "BSD-3-Clause",
   "require": {
     "php": ">=8.0.0",
-    "ext-redis": "^5.0.0",
+    "ext-redis": "^5|^6",
     "ext-json": "*",
     "dibify/dibify": "^0.8.0"
   },
