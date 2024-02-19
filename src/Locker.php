@@ -134,7 +134,7 @@ class Locker implements LockerInterface
         return false;
     }
 
-    public function isLockedFor(ModelInterface $model, Lock $lock): bool
+    public function isLockedFor(ModelInterface|Reference $model, Lock $lock): bool
     {
         if (!$actualLock = $this->getLock($model)) {
             return false;
@@ -144,9 +144,11 @@ class Locker implements LockerInterface
     }
 
 
-    public function getLock(ModelInterface $model): ?Lock
+    public function getLock(ModelInterface|Reference $model): ?Lock
     {
-        $modelKey = $this->getKeyPrefix() . $this->getModelKey($model);
+        $modelRef = $model instanceof ModelInterface ? Reference::to($model) : $model;
+
+        $modelKey = $this->getKeyPrefix() . $this->getModelKey($modelRef);
         $modelLocker = $this->getRedis()->get($modelKey);
 
         if (!$modelLocker) {
